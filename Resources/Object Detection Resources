@@ -1,0 +1,80 @@
+Object Detection Resources
+
+Resource: http://cv-tricks.com/object-detection/faster-r-cnn-yolo-ssd/
+
+Difference tasks
+- classification: find a label of an image (one object, don't care where it is)
+- localization: we know the label of the object, find its location (i.e. where is a cat in the image)
+- detection: predict the location of the object along with its label
+
+We do detection task. Variables we have to predict are: class_name, bounding_box_top_left_x_coordinate, bounding_box_top_left_y_coordinate, bounding_box_width, bounding_box_height
+
+Initial idea: Run CNN on eah patch of the image, and we also have pyramid of images => this is extremently slow. 
+R-CNN: reduce number of patches to run CNN on by pedicting bounding boxes of where the image might be. this is known as selective search. Selective search uses local cues like texture, intensity, color and/or a measure of insideness etc to generate all the possible locations of the object. Now, we can feed these boxes to our CNN based classifier. Remember, fully connected part of CNN takes a fixed sized input so, we resize(without preserving aspect ratio) all the generated boxes to a fixed size (224×224 for VGG) and feed to the CNN part. Hence, there are 3 important parts of R-CNN:
+
+    * Run Selective Search to generate probable objects.
+    * Feed these patches to CNN, followed by SVM to predict the class of each patch.
+    * Optimize patches by training bounding box regression separately.
+
+This is still slow
+Fast RCNN and Faster RCNN try to speed up the process
+
+All these models above are CNN based
+
+There are also regression-based object. The most polular ones are YOLO and SSD
+
+YOLO (you look only once) divides image into SxS grid and outputs N bounding boxes for each grid and their probabilities. It also predicts the object for that bounding box
+So YOLO predicts S x S x N bounding boxes but most of them have low confidence. YOLO is fast to train but predicts only one class per grid and can have lower accuracy
+
+SSD is a goob balance between speed and accuracy. Runs CNN once on the image to pool out feature map and then uses smaller CNN kernels to do boundary and class predicions.
+
+Which one to choose ? 
+Currently, Faster-RCNN is the choice if you are fanatic about the accuracy numbers. However, if you are strapped for computation(probably running it on Nvidia Jetsons), SSD is a better recommendation. Finally, if accuracy is not too much of a concern but you want to go super fast, YOLO will be the way to go. First of all a visual understanding of speed vs accuracy trade-off:
+
+
+
+Note: there is an image we can use for our poster / report that compares difference methods
+
+YOLO is abut 40% accuracy while SSD and faster RCNN are about 50% for larger objects and it seems we should be using Faster RCNN
+
+Resource: https://www.suasnews.com/2017/10/flytbase-releases-ai-platform-drones/
+
+These guys actualy developed platform that works with drones. Below is some of the challenges they faces and what they did about them
+
+Challenges and Solutions
+
+Using high resolution aerial images to train computer vision models poses unique challenges:
+
+a. Lack of sufficient training data: There are plenty of open training datasets out there, but almost all of them have images taken from human eye level. What makes aerial images unique is their top-down view of the objects. Moreover, for custom object detection, customers don’t often have enough images to train the model on, wherein we have to make do with limited set of images.
+
+b. Very high resolution of the images: Computer vision models can process images of limited resolution at a time. For high-resolution images, we need to crop the images into sizable chunks and run inference on them one at a time. This can lead to double counting or misses.
+
+c. Shallow features of objects: When looked down from the top, objects can have very generic shapes which a) can be hard to detect and b) can appear to be similar to other objects.
+
+Their workflow:
+We started with 400 images which constituted an orthoimage, and extracted 1000×600 sized images, which had either oryx in them, or oryx like objects. These were then labeled and packaged into training and testing datasets in the Pascal VOC format. (it seems they actually draw manually boxes around the objects and labeled them)
+
+A Faster R-CNN based object detection pipeline was set up in the cloud using the tensorflow object detection library. In the pipeline, the images were augmented by horizontally flipping and random resizing. Once everything was in place, the model was trained for 10k iterations.
+
+The model so prepared could scan a 1000×600 sized image for Oryx. But it had to run on a high-resolution orthoimage (29200×24160 pixels). To meet that requirement, the orthoimage was split into sections sized 1000×600. Detection was executed on them, individually, and the results were stitched back. To avoid double counting or misses, the
+split-detect-stitch procedure was repeated with different offsets for the splits, and the median count of all the runs was obtained.
+
+
+So again, bottom line: we focus on faster RCNN
+Resource: https://medium.com/@smallfishbigsea/faster-r-cnn-explained-864d4fb7e3f8
+This is an article from medium explaining how faster RCNN works
+
+The one of the core concepts is the anchor. The anchor is the various possible bounding boxes and by default their are 9 possible bounding boxed for the patch of image. They have different aspect ratios. But good news for us, since we are counting only one type of the object, the aspect ratio should be retalively fixed, which can reduce computation time
+
+How do this achors work? They are part of Region Proposal Network. The idea behind it that region proposal network is bunch of boxes that will be examined by classifiers so RPN predicts the possibility of an achor to be background or foreground and refine the anchor. By the end of the training of RPN what we get is a classifier that classifies and anchor as background or foreground and fire-tunes the size and position of the anchor (bounding box regressor). 
+
+The Classifier of Background and Foreground
+
+The basic idea here is that we want to label the anchors having the higher overlaps with ground-truth boxes as foreground, the ones with lower overlaps as background. There are some tweaks to it and there is an implementation in caffe that does that (look into it). By the end of it we will have labels for the anchors. Now the the training data is complete with features and labels
+
+
+I have found another git repo for the MC COCO dataset pretrained model. This is actually MASK-RCNN which does the segmentation on top of classification and bounding boxes. 
+https://github.com/matterport/Mask_RCNN
+
+
+
